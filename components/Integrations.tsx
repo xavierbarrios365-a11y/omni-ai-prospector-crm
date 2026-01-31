@@ -174,24 +174,16 @@ const Integrations: React.FC<IntegrationsProps> = ({ language }) => {
           </div>
         </div>
         <div className="glass p-6 rounded-3xl border border-white/10 flex items-center space-x-4">
-          <div className={`w-3 h-3 rounded-full animate-pulse ${systemHealth.quota === 'safe' ? 'bg-indigo-500' : systemHealth.quota === 'checking' ? 'bg-yellow-500' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]'}`}></div>
+          <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center border border-teal-500/30">
+            <span className="text-xl">✨</span>
+          </div>
           <div>
-            <p className="text-[10px] font-black text-slate-500 uppercase">Cuota</p>
-            <p className={`text-xs font-bold ${systemHealth.quota === 'safe' ? 'text-white' : systemHealth.quota === 'checking' ? 'text-yellow-400' : 'text-red-500'}`}>
-              {systemHealth.quota === 'checking' ? 'VERIFICANDO...' : getQuotaStatusText()}
+            <p className="text-[10px] font-black text-slate-500 uppercase">Tokens Ahorrados</p>
+            <p className="text-xs font-bold text-teal-400">
+              {quotaService.getSavedTokens().toLocaleString()}
             </p>
           </div>
-          <div className="glass p-6 rounded-3xl border border-white/10 flex items-center space-x-4">
-            <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center border border-teal-500/30">
-              <span className="text-xl">✨</span>
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-500 uppercase">Tokens Ahorrados</p>
-              <p className="text-xs font-bold text-teal-400">
-                {quotaService.getSavedTokens().toLocaleString()}
-              </p>
-            </div>
-          </div>
+        </div>
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
