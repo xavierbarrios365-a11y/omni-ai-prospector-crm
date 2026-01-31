@@ -15,8 +15,16 @@ interface CalendarProps {
 const Calendar: React.FC<CalendarProps> = ({ leads, events, setEvents, language }) => {
   const t = translations[language].calendar;
   const [showAiModal, setShowAiModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<Partial<CalendarEvent>[]>([]);
+  const [newEvent, setNewEvent] = useState({
+    title: '',
+    date: new Date().toISOString().split('T')[0],
+    type: 'post' as 'post' | 'email' | 'meeting',
+    socialNetwork: 'Instagram' as 'Instagram' | 'Facebook' | 'LinkedIn' | 'TikTok',
+    status: 'scheduled' as 'draft' | 'scheduled' | 'published'
+  });
 
   const handleGenerateAiSuggestions = async () => {
     setIsGenerating(true);
@@ -31,7 +39,7 @@ const Calendar: React.FC<CalendarProps> = ({ leads, events, setEvents, language 
     const today = new Date();
     const futureDate = new Date(today);
     futureDate.setDate(today.getDate() + Math.floor(Math.random() * 10));
-    
+
     const event: CalendarEvent = {
       ...suggestion,
       id: 'ev-' + Date.now() + Math.random().toString(36).substr(2, 4),
@@ -39,7 +47,7 @@ const Calendar: React.FC<CalendarProps> = ({ leads, events, setEvents, language 
       day: futureDate.getDate(),
       status: 'scheduled'
     };
-    
+
     setEvents(prev => [...prev, event]);
     await workspace.executeAction('saveEvent', event);
     setAiSuggestions(prev => prev.filter(s => s !== suggestion));
@@ -52,6 +60,30 @@ const Calendar: React.FC<CalendarProps> = ({ leads, events, setEvents, language 
     TikTok: 'border-slate-200 text-slate-100 bg-white/5',
   };
 
+  const createManualEvent = async () => {
+    if (!newEvent.title) return;
+    const eventDate = new Date(newEvent.date);
+    const event: CalendarEvent = {
+      id: 'ev-' + Date.now() + Math.random().toString(36).substr(2, 4),
+      title: newEvent.title,
+      date: newEvent.date,
+      day: eventDate.getDate(),
+      type: newEvent.type,
+      socialNetwork: newEvent.socialNetwork,
+      status: newEvent.status
+    };
+    setEvents(prev => [...prev, event]);
+    await workspace.executeAction('saveEvent', event);
+    setShowEventModal(false);
+    setNewEvent({
+      title: '',
+      date: new Date().toISOString().split('T')[0],
+      type: 'post',
+      socialNetwork: 'Instagram',
+      status: 'scheduled'
+    });
+  };
+
   return (
     <div className="space-y-8 animate-fade-in relative pb-20">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -59,9 +91,20 @@ const Calendar: React.FC<CalendarProps> = ({ leads, events, setEvents, language 
           <h2 className="text-3xl font-bold text-white uppercase tracking-tighter">Content Cloud Strategy</h2>
           <p className="text-slate-500 text-sm">Sincronización total con Google Calendar activa.</p>
         </div>
-        <button onClick={handleGenerateAiSuggestions} className="bg-amber-500 hover:scale-105 text-white px-6 py-3 rounded-xl font-bold text-xs shadow-lg transition-all uppercase tracking-widest flex items-center space-x-2">
-           <span>⚡ Generar Plan IA a Cloud</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowEventModal(true)}
+            className="bg-emerald-600 hover:scale-105 text-white px-6 py-3 rounded-xl font-bold text-xs shadow-lg transition-all uppercase tracking-widest"
+          >
+            + Nuevo Evento
+          </button>
+          <button
+            onClick={handleGenerateAiSuggestions}
+            className="bg-amber-500 hover:scale-105 text-white px-6 py-3 rounded-xl font-bold text-xs shadow-lg transition-all uppercase tracking-widest flex items-center space-x-2"
+          >
+            <span>⚡ Plan IA</span>
+          </button>
+        </div>
       </header>
 
       <div className="glass p-6 rounded-3xl border border-white/10 overflow-x-auto">
@@ -111,6 +154,79 @@ const Calendar: React.FC<CalendarProps> = ({ leads, events, setEvents, language 
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Nuevo Evento Manual */}
+      {showEventModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass w-full max-w-md p-8 rounded-[2.5rem] border border-white/20">
+            <h3 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">Nuevo Evento</h3>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Título del evento..."
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                value={newEvent.title}
+                onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
+              />
+              <input
+                type="date"
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                value={newEvent.date}
+                onChange={e => setNewEvent({ ...newEvent, date: e.target.value })}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                  value={newEvent.type}
+                  onChange={e => setNewEvent({ ...newEvent, type: e.target.value as any })}
+                >
+                  <option value="post">📱 Post</option>
+                  <option value="email">📧 Email</option>
+                  <option value="meeting">📅 Reunión</option>
+                </select>
+                <select
+                  className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                  value={newEvent.socialNetwork}
+                  onChange={e => setNewEvent({ ...newEvent, socialNetwork: e.target.value as any })}
+                >
+                  <option value="Instagram">Instagram</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                  <option value="TikTok">TikTok</option>
+                </select>
+              </div>
+              <div className="flex space-x-3">
+                {(['draft', 'scheduled', 'published'] as const).map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setNewEvent({ ...newEvent, status: s })}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase transition-all ${newEvent.status === s
+                        ? s === 'published' ? 'bg-emerald-600 text-white' : s === 'scheduled' ? 'bg-blue-600 text-white' : 'bg-slate-600 text-white'
+                        : 'bg-white/10 text-slate-400'
+                      }`}
+                  >
+                    {s === 'draft' ? 'Borrador' : s === 'scheduled' ? 'Agendado' : 'Publicado'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex space-x-3 pt-2">
+                <button
+                  onClick={() => setShowEventModal(false)}
+                  className="flex-1 py-3 bg-white/10 rounded-xl font-bold text-white uppercase tracking-widest text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={createManualEvent}
+                  className="flex-1 py-3 bg-emerald-600 rounded-xl font-bold text-white uppercase tracking-widest text-xs"
+                >
+                  Crear Evento
+                </button>
+              </div>
             </div>
           </div>
         </div>

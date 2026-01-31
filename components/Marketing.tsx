@@ -20,7 +20,13 @@ const Marketing: React.FC<MarketingProps> = ({ language, leads, campaigns, setCa
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [newCampaignData, setNewCampaignData] = useState({ industry: '', objective: '' });
+  const [useAI, setUseAI] = useState(true);
+  const [newCampaignData, setNewCampaignData] = useState({
+    name: '',
+    industry: '',
+    objective: '',
+    description: ''
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -36,16 +42,31 @@ const Marketing: React.FC<MarketingProps> = ({ language, leads, campaigns, setCa
     if (!newCampaignData.industry) return;
     setIsGenerating(true);
     try {
-      const result = await gemini.generateCampaign(newCampaignData.industry, newCampaignData.objective);
-      setCampaigns(prev => [result.campaign, ...prev]);
-      setTasks(prev => [...result.tasks, ...prev]);
-      // Persistir campaña al cloud
-      await workspace.executeAction('saveCampaign', result.campaign);
-      // Persistir tareas asociadas al cloud
-      for (const task of result.tasks) {
-        await workspace.executeAction('saveTask', task);
+      if (useAI) {
+        // Creación con IA (comportamiento original)
+        const result = await gemini.generateCampaign(newCampaignData.industry, newCampaignData.objective);
+        setCampaigns(prev => [result.campaign, ...prev]);
+        setTasks(prev => [...result.tasks, ...prev]);
+        await workspace.executeAction('saveCampaign', result.campaign);
+        for (const task of result.tasks) {
+          await workspace.executeAction('saveTask', task);
+        }
+      } else {
+        // Creación MANUAL sin IA
+        const manualCampaign: Campaign = {
+          id: `c-${Date.now()}`,
+          name: newCampaignData.name || `Campaña ${newCampaignData.industry}`,
+          targetIndustry: newCampaignData.industry,
+          description: newCampaignData.description || newCampaignData.objective,
+          status: 'Draft',
+          leadsReached: 0,
+          openRate: '0%'
+        };
+        setCampaigns(prev => [manualCampaign, ...prev]);
+        await workspace.executeAction('saveCampaign', manualCampaign);
       }
       setShowCreateModal(false);
+      setNewCampaignData({ name: '', industry: '', objective: '', description: '' });
     } catch (e) { console.error(e); } finally { setIsGenerating(false); }
   };
 
@@ -109,13 +130,65 @@ const Marketing: React.FC<MarketingProps> = ({ language, leads, campaigns, setCa
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="glass w-full max-w-lg p-10 rounded-[2.5rem] border border-white/20">
-            <h3 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">Lanzar Campaña IA</h3>
-            <div className="space-y-4">
-              <input type="text" placeholder="Nicho..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white" value={newCampaignData.industry} onChange={e => setNewCampaignData({ ...newCampaignData, industry: e.target.value })} />
-              <textarea placeholder="Objetivo..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white h-32" value={newCampaignData.objective} onChange={e => setNewCampaignData({ ...newCampaignData, objective: e.target.value })} />
-              <button onClick={handleCreateCampaign} disabled={isGenerating} className="w-full py-4 bg-blue-600 rounded-xl font-bold text-white uppercase tracking-widest">
-                {isGenerating ? 'Configurando Agentes...' : 'Lanzar Campaña'}
+            <h3 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">Nueva Campaña</h3>
+
+            {/* Toggle IA / Manual */}
+            <div className="flex mb-6 bg-black/40 rounded-xl p-1">
+              <button
+                onClick={() => setUseAI(true)}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${useAI ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
+              >
+                ⚡ Con IA
               </button>
+              <button
+                onClick={() => setUseAI(false)}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${!useAI ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
+              >
+                ✏️ Manual
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {!useAI && (
+                <input
+                  type="text"
+                  placeholder="Nombre de la campaña..."
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                  value={newCampaignData.name}
+                  onChange={e => setNewCampaignData({ ...newCampaignData, name: e.target.value })}
+                />
+              )}
+              <input
+                type="text"
+                placeholder="Nicho / Industria..."
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                value={newCampaignData.industry}
+                onChange={e => setNewCampaignData({ ...newCampaignData, industry: e.target.value })}
+              />
+              <textarea
+                placeholder={useAI ? "Objetivo de la campaña..." : "Descripción de la campaña..."}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white h-32"
+                value={useAI ? newCampaignData.objective : newCampaignData.description}
+                onChange={e => setNewCampaignData({
+                  ...newCampaignData,
+                  [useAI ? 'objective' : 'description']: e.target.value
+                })}
+              />
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => { setShowCreateModal(false); setNewCampaignData({ name: '', industry: '', objective: '', description: '' }); }}
+                  className="flex-1 py-4 bg-white/10 rounded-xl font-bold text-white uppercase tracking-widest text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCreateCampaign}
+                  disabled={isGenerating}
+                  className={`flex-1 py-4 rounded-xl font-bold text-white uppercase tracking-widest text-xs ${useAI ? 'bg-blue-600' : 'bg-emerald-600'}`}
+                >
+                  {isGenerating ? 'Procesando...' : (useAI ? 'Generar con IA' : 'Crear Campaña')}
+                </button>
+              </div>
             </div>
           </div>
         </div>

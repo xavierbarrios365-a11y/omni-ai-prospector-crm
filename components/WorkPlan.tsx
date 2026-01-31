@@ -16,6 +16,13 @@ const WorkPlan: React.FC<WorkPlanProps> = ({ tasks, setTasks, leads, language })
   const wt = translations[language].workspace;
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [newTask, setNewTask] = useState({
+    title: '',
+    priority: 'medium' as 'low' | 'medium' | 'high',
+    assignee: '',
+    leadId: ''
+  });
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(Date.now()), 30000);
@@ -58,11 +65,26 @@ const WorkPlan: React.FC<WorkPlanProps> = ({ tasks, setTasks, leads, language })
     const taskId = e.dataTransfer.getData('taskId');
     const updatedTask = tasks.find(t => t.id === taskId);
     if (updatedTask) {
-      const newTask = { ...updatedTask, status: newStatus };
-      setTasks(prev => prev.map(t => t.id === taskId ? newTask : t));
-      // Persistir cambio de estado al cloud
-      await workspace.executeAction('saveTask', newTask);
+      const taskToUpdate = { ...updatedTask, status: newStatus };
+      setTasks(prev => prev.map(t => t.id === taskId ? taskToUpdate : t));
+      await workspace.executeAction('saveTask', taskToUpdate);
     }
+  };
+
+  const createManualTask = async () => {
+    if (!newTask.title) return;
+    const task: Task = {
+      id: `task-${Date.now()}`,
+      title: newTask.title,
+      priority: newTask.priority,
+      assignee: newTask.assignee || 'Sin asignar',
+      status: 'todo',
+      leadId: newTask.leadId || undefined
+    };
+    setTasks(prev => [task, ...prev]);
+    await workspace.executeAction('saveTask', task);
+    setShowTaskModal(false);
+    setNewTask({ title: '', priority: 'medium', assignee: '', leadId: '' });
   };
 
   return (
@@ -74,6 +96,12 @@ const WorkPlan: React.FC<WorkPlanProps> = ({ tasks, setTasks, leads, language })
         </div>
         <div className="flex space-x-3">
           <button
+            onClick={() => setShowTaskModal(true)}
+            className="flex items-center space-x-2 bg-emerald-600 hover:scale-105 text-white px-5 py-2.5 rounded-xl font-bold transition-all text-xs shadow-lg shadow-emerald-600/20"
+          >
+            <span>+ Nueva Tarea</span>
+          </button>
+          <button
             onClick={generateAIPlan}
             disabled={isGenerating}
             className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-emerald-600 hover:scale-105 text-white px-5 py-2.5 rounded-xl font-bold transition-all text-xs shadow-lg shadow-blue-600/20"
@@ -81,7 +109,7 @@ const WorkPlan: React.FC<WorkPlanProps> = ({ tasks, setTasks, leads, language })
             {isGenerating ? <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div> :
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
             }
-            <span>Generar Plan Estratégico IA</span>
+            <span>Generar Plan IA</span>
           </button>
         </div>
       </header>
@@ -110,6 +138,69 @@ const WorkPlan: React.FC<WorkPlanProps> = ({ tasks, setTasks, leads, language })
           );
         })}
       </div>
+
+      {/* Modal Nueva Tarea Manual */}
+      {showTaskModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass w-full max-w-md p-8 rounded-[2.5rem] border border-white/20">
+            <h3 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">Nueva Tarea</h3>
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="Título de la tarea..."
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                value={newTask.title}
+                onChange={e => setNewTask({ ...newTask, title: e.target.value })}
+              />
+              <div className="flex space-x-3">
+                {(['low', 'medium', 'high'] as const).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setNewTask({ ...newTask, priority: p })}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold uppercase transition-all ${newTask.priority === p
+                        ? p === 'high' ? 'bg-red-600 text-white' : p === 'medium' ? 'bg-amber-600 text-white' : 'bg-blue-600 text-white'
+                        : 'bg-white/10 text-slate-400'
+                      }`}
+                  >
+                    {p === 'high' ? 'Alta' : p === 'medium' ? 'Media' : 'Baja'}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Asignado a..."
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                value={newTask.assignee}
+                onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}
+              />
+              {leads.length > 0 && (
+                <select
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white"
+                  value={newTask.leadId}
+                  onChange={e => setNewTask({ ...newTask, leadId: e.target.value })}
+                >
+                  <option value="">Lead asociado (opcional)</option>
+                  {leads.map(l => <option key={l.id} value={l.id}>{l.businessName}</option>)}
+                </select>
+              )}
+              <div className="flex space-x-3 pt-2">
+                <button
+                  onClick={() => { setShowTaskModal(false); setNewTask({ title: '', priority: 'medium', assignee: '', leadId: '' }); }}
+                  className="flex-1 py-3 bg-white/10 rounded-xl font-bold text-white uppercase tracking-widest text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={createManualTask}
+                  className="flex-1 py-3 bg-emerald-600 rounded-xl font-bold text-white uppercase tracking-widest text-xs"
+                >
+                  Crear Tarea
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
