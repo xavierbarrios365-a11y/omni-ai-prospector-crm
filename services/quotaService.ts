@@ -50,6 +50,17 @@ class QuotaService {
     window.dispatchEvent(new CustomEvent('quota_updated'));
   }
 
+  recordSavedTokens(responseSize: number) {
+    const tokens = Math.ceil(responseSize / 4);
+    const saved = parseInt(localStorage.getItem('omni_tokens_saved') || '0');
+    localStorage.setItem('omni_tokens_saved', (saved + tokens).toString());
+    window.dispatchEvent(new CustomEvent('quota_updated'));
+  }
+
+  getSavedTokens(): number {
+    return parseInt(localStorage.getItem('omni_tokens_saved') || '0');
+  }
+
   getTotalTokens(): number {
     return parseInt(localStorage.getItem('omni_tokens_total') || '0');
   }

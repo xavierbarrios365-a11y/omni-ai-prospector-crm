@@ -10,6 +10,10 @@ export class GeminiService {
     return new GoogleGenAI({ apiKey: key });
   }
 
+  private getCacheKey(contents: any, model: string): string {
+    return `omni_cache_${btoa(JSON.stringify(contents)).substring(0, 32)}_${model}`;
+  }
+
   private async callWithResilience(modelType: QuotaModel, config: any, contents: any, retries = 3, forceModel?: AIModelPreference) {
     let activeModel: QuotaModel = modelType;
 
@@ -20,8 +24,20 @@ export class GeminiService {
     }
 
     const modelName = activeModel === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
-    const quota = quotaService.getAvailability(activeModel);
 
+    // MAGIA: Verificar Caché
+    const cacheKey = this.getCacheKey(contents, modelName);
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts < 86400000) { // 24h
+        console.log(`✨ [Token Magic] Rescatando respuesta de caché para ${modelName}`);
+        quotaService.recordSavedTokens(data.length);
+        return { text: data };
+      }
+    }
+
+    const quota = quotaService.getAvailability(activeModel);
     if (quota.isBlocked) {
       throw new Error(`CORE_QUOTA_ERROR: ${activeModel.toUpperCase()} agotado.`);
     }
@@ -38,6 +54,10 @@ export class GeminiService {
         });
 
         const responseText = response.text || "";
+
+        // MAGIA: Guardar en Caché
+        localStorage.setItem(cacheKey, JSON.stringify({ data: responseText, ts: Date.now() }));
+
         quotaService.recordRequest(activeModel, responseText.length);
         return response;
       } catch (e: any) {

@@ -181,7 +181,17 @@ const Integrations: React.FC<IntegrationsProps> = ({ language }) => {
               {systemHealth.quota === 'checking' ? 'VERIFICANDO...' : getQuotaStatusText()}
             </p>
           </div>
-        </div>
+          <div className="glass p-6 rounded-3xl border border-white/10 flex items-center space-x-4">
+            <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center border border-teal-500/30">
+              <span className="text-xl">✨</span>
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-500 uppercase">Tokens Ahorrados</p>
+              <p className="text-xs font-bold text-teal-400">
+                {quotaService.getSavedTokens().toLocaleString()}
+              </p>
+            </div>
+          </div>
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
