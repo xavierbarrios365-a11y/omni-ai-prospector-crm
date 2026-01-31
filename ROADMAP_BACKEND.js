@@ -176,6 +176,30 @@ function doPost(e) {
       return createJsonResponse({ status: 'saved' });
     }
 
+    if (action === 'deleteKnowledge') {
+      var s = ss.getSheetByName(KNOWLEDGE_SHEET);
+      if (s.getLastRow() > 1) {
+        var range = s.getRange(2, 1, s.getLastRow() - 1, s.getLastColumn());
+        var values = range.getValues();
+        for (var i = 0; i < values.length; i++) {
+          // Buscamos por título y fecha (que es el ID en la primera columna)
+          if (values[i][2] === payload.title && values[i][0] === payload.id) {
+            // Intentar borrar archivo de Drive si tiene URL
+            var fileUrl = values[i][4];
+            if (fileUrl && fileUrl.includes('id=')) {
+              try {
+                var fileId = fileUrl.split('id=')[1];
+                DriveApp.getFileById(fileId).setTrashed(true);
+              } catch (e) { console.error("Drive error:", e); }
+            }
+            s.deleteRow(i + 2);
+            return createJsonResponse({ status: 'deleted' });
+          }
+        }
+      }
+      return createJsonResponse({ status: 'not_found' });
+    }
+
     if (action === 'deleteLead') {
       var s = ss.getSheetByName(DB_SHEET);
       if (s.getLastRow() > 1) {

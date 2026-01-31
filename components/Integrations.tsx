@@ -216,12 +216,36 @@ const Integrations: React.FC<IntegrationsProps> = ({ language }) => {
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="glass w-full max-w-lg p-10 rounded-[2.5rem] border border-white/20">
-            <h3 className="text-2xl font-black text-white mb-6 uppercase">Conectar {showModal.toUpperCase()}</h3>
-            <p className="text-sm text-slate-400 mb-6">Pega tu API Key de {showModal}. Esta se sincronizará automáticamente con tu Google Sheet.</p>
-            <input
-              type="text" value={tempKey} onChange={e => setTempKey(e.target.value)}
-              placeholder="sk-..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-xs text-white mb-6 outline-none focus:border-blue-500"
-            />
+            <p className="text-sm text-slate-400 mb-6">
+              {showModal === 'make'
+                ? "Configura tu Webhook de Make.io para enviar notificaciones a WhatsApp o Telegram."
+                : showModal === 'apify'
+                  ? "Conecta Apify para automatizar mensajes en Instagram y Facebook o realizar scraping avanzado."
+                  : `Pega tu API Key de ${showModal}. Esta se sincronizará automáticamente con tu Google Sheet.`}
+            </p>
+
+            <div className="space-y-4 mb-8">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
+                {showModal === 'make' ? 'URL del Webhook (WhatsApp)' : 'API Key / Token de Acceso'}
+              </label>
+              <input
+                type="text" value={tempKey} onChange={e => setTempKey(e.target.value)}
+                placeholder={showModal === 'make' ? "https://hook.make.com/..." : "sk-..."}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-4 text-xs text-white outline-none focus:border-blue-500"
+              />
+
+              {showModal === 'apify' && (
+                <div className="p-4 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
+                  <p className="text-[10px] font-bold text-indigo-400 uppercase mb-2">Guía de Conexión Social</p>
+                  <ul className="text-[10px] text-slate-400 space-y-1 list-disc ml-4">
+                    <li>Usa el actor "Instagram Scraper" para prospectar competidores.</li>
+                    <li>Usa "Facebook Pages Messaging" para automatizar respuestas.</li>
+                    <li>Asegúrate de configurar el Webhook en Apify hacia tu Cloud Engine.</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-4">
               <button onClick={() => setShowModal(null)} className="flex-1 py-4 bg-white/5 rounded-xl text-white font-bold text-[10px] uppercase">Cerrar</button>
               <button onClick={handleSaveKey} className="flex-1 py-4 bg-blue-600 rounded-xl text-white font-bold text-[10px] uppercase">Guardar y Sincronizar</button>

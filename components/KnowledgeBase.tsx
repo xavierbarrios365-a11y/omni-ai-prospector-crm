@@ -57,6 +57,17 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
     }
   };
 
+  const handleDeleteCard = async (guide: StrategyGuide) => {
+    if (!window.confirm("¿Estás seguro de que quieres eliminar este material?")) return;
+    setIsSyncing(guide.id);
+    try {
+      const result = await workspace.executeAction('deleteKnowledge', { id: guide.id, title: guide.title });
+      if (result.status === 'deleted') {
+        setGuides(prev => prev.filter(g => g.id !== guide.id));
+      }
+    } catch (e) { console.error(e); } finally { setIsSyncing(null); }
+  };
+
   const handleAddCard = async () => {
     if (!newCard.title && !selectedFile) return;
     setIsSyncing('new');
@@ -70,6 +81,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
           payload.fileData = base64;
           payload.mimeType = selectedFile.type;
           payload.fileName = selectedFile.name;
+          payload.id = new Date().toLocaleString(); // Usamos la fecha como ID inicial
           const result = await workspace.executeAction('saveKnowledge', payload);
           setShowAddModal(false);
           setSelectedFile(null);
@@ -78,6 +90,7 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
           setIsSyncing(null);
         };
       } else {
+        payload.id = new Date().toLocaleString();
         await workspace.executeAction('saveKnowledge', payload);
         setShowAddModal(false);
         loadCloudKnowledge();
@@ -116,8 +129,15 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeSubTab === 'materials' ? (
                 guides.map(guide => (
-                  <div key={guide.id} className="glass p-6 rounded-3xl border border-white/10 flex flex-col h-full hover:border-blue-500/40 transition-all">
-                    <div className="flex justify-between items-start mb-4">
+                  <div key={guide.id} className="glass p-6 rounded-3xl border border-white/10 flex flex-col h-full hover:border-blue-500/40 transition-all relative group/card">
+                    <button
+                      onClick={() => handleDeleteCard(guide)}
+                      disabled={isSyncing === guide.id}
+                      className="absolute top-4 right-4 text-slate-600 hover:text-red-500 opacity-0 group-hover/card:opacity-100 transition-all"
+                    >
+                      {isSyncing === guide.id ? '...' : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" strokeWidth={2} /></svg>}
+                    </button>
+                    <div className="flex justify-between items-start mb-4 pr-8">
                       <span className="text-[9px] font-black text-blue-400 uppercase bg-blue-500/10 px-2 py-1 rounded">{guide.category}</span>
                       {guide.fileUrl && <a href={guide.fileUrl} target="_blank" className="text-[10px] text-emerald-400 hover:underline">🔗 Drive</a>}
                     </div>
