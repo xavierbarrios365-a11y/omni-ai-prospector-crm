@@ -58,11 +58,22 @@ const Sidebar: React.FC<SidebarProps> = ({
     const rpdPerc = (availability.rpdLeft / availability.rpdTotal) * 100;
     const isBlocked = availability.isBlocked;
 
+    const getLabel = () => {
+      if (!isBlocked) return `${label} ${availability.rpmLeft}/${availability.rpmTotal}`;
+
+      if (availability.isDailyBlocked) {
+        const hours = Math.ceil(availability.nextDailyAvailableIn / 3600);
+        return `${label} AGOTADO (${hours}H)`;
+      }
+
+      return `${label} RECARGANDO (${availability.nextMinuteAvailableIn}S)`;
+    };
+
     return (
       <div className="space-y-1.5">
         <div className="flex justify-between items-center">
-          <span className={`text-[7px] font-black uppercase tracking-widest ${isBlocked ? 'text-red-400' : 'text-slate-500'}`}>
-            {label} {isBlocked ? (availability.nextAvailableIn > 60 ? `(ESPERA ${Math.ceil(availability.nextAvailableIn / 3600)}H)` : `(ESPERA ${availability.nextAvailableIn}S)`) : `${availability.rpmLeft}/${availability.rpmTotal}`}
+          <span className={`text-[7px] font-black uppercase tracking-widest ${isBlocked ? 'text-red-400' : availability.warning === 'LOW_QUOTA' ? 'text-orange-400' : 'text-slate-500'}`}>
+            {getLabel()}
           </span>
         </div>
         <div className="h-0.5 bg-white/5 rounded-full overflow-hidden">

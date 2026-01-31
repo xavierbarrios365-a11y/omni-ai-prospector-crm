@@ -80,15 +80,24 @@ const Integrations: React.FC<IntegrationsProps> = ({ language }) => {
   };
 
   const getQuotaStatusText = () => {
-    const q = quotaService.getAvailability('pro'); // Usamos Pro como referencia de "cuota crítica"
+    const q = quotaService.getAvailability('pro');
     if (systemHealth.gemini === 'no_key') return 'SIN API KEY';
-    if (q.isBlocked) {
-      if (q.nextAvailableIn > 60) {
-        return `ESPERA ${Math.ceil(q.nextAvailableIn / 3600)}H`;
-      }
-      return `ESPERA ${q.nextAvailableIn}S`;
+
+    // Si hay un bloqueo diario (24h)
+    if (q.isDailyBlocked) {
+      const hours = Math.ceil(q.nextDailyAvailableIn / 3600);
+      return `DÍA AGOTADO (RESETS ${hours}H)`;
     }
-    return 'SEGURO';
+
+    // Si hay un bloqueo por minuto
+    if (q.isMinuteBlocked) {
+      return `MINUTO AGOTADO (${q.nextMinuteAvailableIn}S)`;
+    }
+
+    // Si no está bloqueado, mostrar qué tan cerca está del límite diario
+    if (q.warning === 'LOW_QUOTA') return `¡CRÍTICO! (${q.rpdLeft} REST)`;
+
+    return `SEGURO (${q.rpmLeft}/MIN)`;
   };
 
   const loadKeys = async () => {

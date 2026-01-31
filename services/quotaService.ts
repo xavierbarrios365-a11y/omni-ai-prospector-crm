@@ -8,7 +8,7 @@ interface QuotaLimits {
 
 const LIMITS: Record<QuotaModel, QuotaLimits> = {
   flash: { rpm: 15, rpd: 1500 },
-  pro: { rpm: 2, rpd: 50 } 
+  pro: { rpm: 2, rpd: 50 }
 };
 
 class QuotaService {
@@ -28,7 +28,7 @@ class QuotaService {
     const now = Date.now();
     // Guardamos la marca de tiempo del bloqueo para persistencia tras reinicio
     localStorage.setItem(`omni_real_block_ts_${model}`, now.toString());
-    
+
     // Forzamos el contador diario a cero virtualmente
     const logs = this.getLogs(model);
     for (let i = 0; i < LIMITS[model].rpd; i++) {
@@ -42,11 +42,11 @@ class QuotaService {
     const logs = this.getLogs(model);
     logs.push(Date.now());
     this.saveLogs(model, logs);
-    
+
     const tokens = Math.ceil(responseSize / 4);
     const totalTokens = parseInt(localStorage.getItem('omni_tokens_total') || '0');
     localStorage.setItem('omni_tokens_total', (totalTokens + tokens).toString());
-    
+
     window.dispatchEvent(new CustomEvent('quota_updated'));
   }
 
@@ -58,7 +58,7 @@ class QuotaService {
     const now = Date.now();
     const oneMinuteAgo = now - 60000;
     const oneDayAgo = now - 86400000;
-    
+
     // Verificar si hay un bloqueo real persistido
     const realBlockTs = parseInt(localStorage.getItem(`omni_real_block_ts_${model}`) || '0');
     const isUnderRealBlock = (now - realBlockTs) < 86400000; // Bloqueo de Google suele ser por 24h o hasta el ciclo
@@ -73,16 +73,16 @@ class QuotaService {
     const rpmLeft = Math.max(0, LIMITS[model].rpm - rpmLogs.length);
     const rpdLeft = isUnderRealBlock ? 0 : Math.max(0, LIMITS[model].rpd - rpdLogs.length);
 
-    let nextAvailableIn = 0;
-    if (rpmLeft <= 0 || rpdLeft <= 0 || isUnderRealBlock) {
-      if (rpmLeft <= 0) {
-        const oldestInMinute = rpmLogs[0] || now;
-        nextAvailableIn = Math.ceil((oldestInMinute + 60000 - now) / 1000);
-      } else {
-        // Si es bloqueo diario, calculamos hasta que pasen 24h del primer log del día
-        const oldestInDay = rpdLogs[0] || realBlockTs || now;
-        nextAvailableIn = Math.ceil((oldestInDay + 86400000 - now) / 1000);
-      }
+    let nextMinuteAvailableIn = 0;
+    if (rpmLeft <= 0) {
+      const oldestInMinute = rpmLogs[0] || now;
+      nextMinuteAvailableIn = Math.ceil((oldestInMinute + 60000 - now) / 1000);
+    }
+
+    let nextDailyAvailableIn = 0;
+    if (rpdLeft <= 0 || isUnderRealBlock) {
+      const oldestInDay = rpdLogs[0] || realBlockTs || now;
+      nextDailyAvailableIn = Math.ceil((oldestInDay + 86400000 - now) / 1000);
     }
 
     return {
@@ -91,8 +91,12 @@ class QuotaService {
       rpmTotal: LIMITS[model].rpm,
       rpdTotal: LIMITS[model].rpd,
       isBlocked: rpmLeft <= 0 || rpdLeft <= 0 || isUnderRealBlock,
+      isMinuteBlocked: rpmLeft <= 0,
       isDailyBlocked: rpdLeft <= 0 || isUnderRealBlock,
-      nextAvailableIn: Math.max(0, nextAvailableIn)
+      nextAvailableIn: Math.max(nextMinuteAvailableIn, nextDailyAvailableIn),
+      nextMinuteAvailableIn: Math.max(0, nextMinuteAvailableIn),
+      nextDailyAvailableIn: Math.max(0, nextDailyAvailableIn),
+      warning: rpdLeft > 0 && rpdLeft < LIMITS[model].rpd * 0.1 ? 'LOW_QUOTA' : null
     };
   }
 
