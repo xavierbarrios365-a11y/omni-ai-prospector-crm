@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { StrategyGuide } from '../types';
-import { GoogleGenAI } from "@google/genai";
+import { gemini } from '../services/geminiService';
 import { Language, translations } from '../translations';
 import { workspace } from '../services/workspaceService';
 
@@ -12,7 +12,7 @@ interface KnowledgeBaseProps {
 const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
   const currentLang = language || 'es';
   const t = translations[currentLang]?.knowledge || translations['es'].knowledge;
-  
+
   const [guides, setGuides] = useState<StrategyGuide[]>([]);
   const [researchLogs, setResearchLogs] = useState<any[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<'materials' | 'history'>('materials');
@@ -39,6 +39,22 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
         if (Array.isArray(data.researchLogs)) setResearchLogs(data.researchLogs);
       }
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
+  };
+
+  const handleAskAI = async () => {
+    if (!aiQuery.trim() || isAsking) return;
+    setIsAsking(true);
+    setAiAnswer("Analizando documentos y preparando respuesta...");
+    try {
+      const context = guides.map(g => `[${g.category}] ${g.title}: ${g.content}`).join("\n---\n");
+      const answer = await gemini.askQuestion(aiQuery, context);
+      setAiAnswer(answer);
+      setAiQuery('');
+    } catch (e: any) {
+      setAiAnswer("Error al consultar al Cerebro Omni: " + (e.message || "Error desconocido"));
+    } finally {
+      setIsAsking(false);
+    }
   };
 
   const handleAddCard = async () => {
@@ -123,13 +139,33 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
             </div>
           )}
         </div>
-        
+
         <div className="glass p-8 rounded-[2rem] border border-blue-500/20 h-[500px] flex flex-col shadow-2xl">
           <h3 className="text-xs font-black text-blue-400 uppercase mb-4 flex items-center">⚡ Cerebro Omni</h3>
-          <div className="flex-1 overflow-y-auto custom-scrollbar mb-4 text-slate-300 text-sm italic">{aiAnswer || "Pregúntame sobre tus documentos o estrategias..."}</div>
+          <div className="flex-1 overflow-y-auto custom-scrollbar mb-4 text-slate-300 text-sm whitespace-pre-wrap">
+            {isAsking ? (
+              <div className="flex items-center space-x-2 text-blue-400 animate-pulse">
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <span>Pensando...</span>
+              </div>
+            ) : aiAnswer || "Pregúntame sobre tus documentos o estrategias..."}
+          </div>
           <div className="relative">
-            <input type="text" value={aiQuery} onChange={e => setAiQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && setIsAsking(true)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs outline-none focus:border-blue-500" placeholder="¿Cómo cerrar el lead X?" />
-            <button className="absolute right-3 top-3 text-blue-500">➜</button>
+            <input
+              type="text"
+              value={aiQuery}
+              onChange={e => setAiQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAskAI()}
+              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs outline-none focus:border-blue-500 pr-12"
+              placeholder="¿Cómo cerrar el lead X?"
+            />
+            <button
+              onClick={handleAskAI}
+              disabled={isAsking}
+              className="absolute right-3 top-2.5 w-8 h-8 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all"
+            >
+              {isAsking ? '...' : '➜'}
+            </button>
           </div>
         </div>
       </div>
@@ -139,17 +175,17 @@ const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ language }) => {
           <div className="glass w-full max-w-lg p-10 rounded-[2.5rem] border border-white/20">
             <h3 className="text-2xl font-black text-white mb-6 uppercase">Subir a Omni Cloud</h3>
             <div className="space-y-4">
-              <select className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white" value={newCard.category} onChange={e => setNewCard({...newCard, category: e.target.value})}>
+              <select className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white" value={newCard.category} onChange={e => setNewCard({ ...newCard, category: e.target.value })}>
                 <option value="Branding">Branding / Stack Técnico</option>
                 <option value="Strategy">Estrategia Comercial</option>
                 <option value="Legal">Documentación Legal</option>
               </select>
-              <input type="text" placeholder="Título" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white" value={newCard.title} onChange={e => setNewCard({...newCard, title: e.target.value})} />
+              <input type="text" placeholder="Título" className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white" value={newCard.title} onChange={e => setNewCard({ ...newCard, title: e.target.value })} />
               <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-white/10 rounded-xl p-8 text-center cursor-pointer hover:border-blue-500 transition-all">
                 <input type="file" ref={fileInputRef} className="hidden" onChange={e => setSelectedFile(e.target.files?.[0] || null)} />
                 <span className="text-white font-bold">{selectedFile ? selectedFile.name : 'Haz clic para subir un archivo'}</span>
               </div>
-              <textarea placeholder="Notas adicionales..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white h-24" value={newCard.content} onChange={e => setNewCard({...newCard, content: e.target.value})} />
+              <textarea placeholder="Notas adicionales..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white h-24" value={newCard.content} onChange={e => setNewCard({ ...newCard, content: e.target.value })} />
               <div className="flex gap-4">
                 <button onClick={() => setShowAddModal(false)} className="flex-1 py-4 bg-white/5 rounded-xl text-white font-bold">Cancelar</button>
                 <button onClick={handleAddCard} disabled={!!isSyncing} className="flex-1 py-4 bg-blue-600 rounded-xl text-white font-bold">{isSyncing ? 'Sincronizando...' : 'Guardar'}</button>

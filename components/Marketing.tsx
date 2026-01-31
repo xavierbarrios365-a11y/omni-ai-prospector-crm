@@ -38,6 +38,25 @@ const Marketing: React.FC<MarketingProps> = ({ language, leads, campaigns, setCa
     }
   };
 
+  const [isGeneratingCopy, setIsGeneratingCopy] = useState<string | null>(null);
+  const [generatedCopies, setGeneratedCopies] = useState<Record<string, string>>({});
+
+  const handleGenerateCopy = async (lead: Lead) => {
+    if (!selectedCampaign) {
+      alert("Selecciona una campaña primero.");
+      return;
+    }
+    setIsGeneratingCopy(lead.id);
+    try {
+      const copy = await gemini.generateMarketingCopy(lead, selectedCampaign);
+      setGeneratedCopies(prev => ({ ...prev, [lead.id]: copy }));
+    } catch (e: any) {
+      alert("Error IA: " + e.message);
+    } finally {
+      setIsGeneratingCopy(null);
+    }
+  };
+
   const handleCreateCampaign = async () => {
     if (!newCampaignData.industry) return;
     setIsGenerating(true);
@@ -114,13 +133,30 @@ const Marketing: React.FC<MarketingProps> = ({ language, leads, campaigns, setCa
                     <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${getStatusColor(lead.status)}`}>{lead.status}</span>
                   </div>
                   <p className="text-[10px] text-slate-500 line-clamp-1 mb-4">{lead.website}</p>
+
+                  {generatedCopies[lead.id] && (
+                    <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                      <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-2 flex justify-between items-center">
+                        <span>Copy Generado ✨</span>
+                        <button onClick={() => navigator.clipboard.writeText(generatedCopies[lead.id])} className="hover:text-white transition-colors">Copiar</button>
+                      </p>
+                      <p className="text-[10px] text-slate-300 leading-relaxed whitespace-pre-wrap">{generatedCopies[lead.id]}</p>
+                    </div>
+                  )}
+
                   <div className="flex space-x-2">
                     {lead.email ? <span className="w-6 h-6 rounded bg-emerald-500/10 flex items-center justify-center text-[10px]">📧</span> : <span className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-[10px] grayscale opacity-50">❌</span>}
                     {lead.instagram ? <span className="w-6 h-6 rounded bg-pink-500/10 flex items-center justify-center text-[10px]">📸</span> : <span className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-[10px] grayscale opacity-50">❌</span>}
                     {lead.facebook ? <span className="w-6 h-6 rounded bg-blue-500/10 flex items-center justify-center text-[10px]">👥</span> : <span className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-[10px] grayscale opacity-50">❌</span>}
                   </div>
                 </div>
-                <button className="mt-4 w-full bg-white/5 hover:bg-white/10 py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-widest">Generar Copy de Ataque</button>
+                <button
+                  onClick={() => handleGenerateCopy(lead)}
+                  disabled={isGeneratingCopy === lead.id || !selectedCampaign}
+                  className={`mt-4 w-full py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition-all ${isGeneratingCopy === lead.id ? 'bg-slate-800' : 'bg-white/5 hover:bg-indigo-600/20 hover:text-indigo-400 border border-white/5'}`}
+                >
+                  {isGeneratingCopy === lead.id ? 'Generando...' : 'Generar Copy de Ataque'}
+                </button>
               </div>
             ))}
           </div>

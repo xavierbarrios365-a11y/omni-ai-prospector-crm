@@ -115,6 +115,30 @@ export class GeminiService {
   }
 
   /**
+   * CEREBRO OMNI: Responde preguntas basadas en el contexto de la base de conocimiento.
+   */
+  async askQuestion(query: string, context: string, preference?: AIModelPreference): Promise<string> {
+    const prompt = `CONTEXTO ESTRATÉGICO:\n${context}\n\nPREGUNTA DEL USUARIO: ${query}\n\nResponde de forma técnica, estratégica y concisa. Si no está en el contexto, usa tu conocimiento B2B general pero prioriza los documentos.`;
+    const res = await this.callWithResilience("flash", {}, prompt, 2, preference);
+    return res.text || "No pude procesar una respuesta.";
+  }
+
+  /**
+   * MARKETING ENGINE: Genera un copy de ataque personalizado para un lead y campaña.
+   */
+  async generateMarketingCopy(lead: Lead, campaign: Campaign, preference?: AIModelPreference): Promise<string> {
+    const prompt = `GENERA UN MENSAJE DE OUTREACH PERSONALIZADO.
+    LEAD: ${lead.businessName} (Industria: ${lead.industry})
+    CAMPAÑA: ${campaign.name}
+    OBJETIVO: ${campaign.description}
+    WEBSITE DEL LEAD: ${lead.website}
+    
+    El mensaje debe ser corto, directo al grano y enfocado en el valor B2B. Máximo 3 párrafos cortos.`;
+    const res = await this.callWithResilience("flash", {}, prompt, 2, preference);
+    return res.text || "Error generando el copy.";
+  }
+
+  /**
    * Verifica la conexión real probando una respuesta mínima.
    * Esto permite detectar si la API Key es válida y si hay cuota disponible.
    */
