@@ -6,12 +6,13 @@ import { workspace } from "./workspaceService";
 
 export class GeminiService {
   private get ai() {
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const key = process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    return new GoogleGenAI({ apiKey: key });
   }
 
   private async callWithResilience(modelType: QuotaModel, config: any, contents: any, retries = 3, forceModel?: AIModelPreference) {
     let activeModel: QuotaModel = modelType;
-    
+
     if (forceModel && forceModel !== 'auto') {
       activeModel = forceModel as QuotaModel;
     } else if (modelType === 'pro' && quotaService.shouldFallbackToFlash()) {
@@ -20,7 +21,7 @@ export class GeminiService {
 
     const modelName = activeModel === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
     const quota = quotaService.getAvailability(activeModel);
-    
+
     if (quota.isBlocked) {
       throw new Error(`CORE_QUOTA_ERROR: ${activeModel.toUpperCase()} agotado.`);
     }
@@ -35,13 +36,13 @@ export class GeminiService {
             systemInstruction: "ERES UN AUDITOR B2B. RESPONDE SIEMPRE EN JSON PLANO.",
           }
         });
-        
+
         const responseText = response.text || "";
         quotaService.recordRequest(activeModel, responseText.length);
         return response;
       } catch (e: any) {
         const errorMsg = e.message?.toLowerCase() || "";
-        
+
         // DETECCIÓN DE CUOTA AGOTADA REAL
         if (errorMsg.includes("quota") || errorMsg.includes("429") || errorMsg.includes("limit")) {
           quotaService.markAsExhausted(activeModel);
@@ -75,9 +76,9 @@ export class GeminiService {
     const prompt = `Campaña para "${industry}". Objetivo: ${objective}. JSON.`;
     const res = await this.callWithResilience("flash", { responseMimeType: "application/json" }, prompt, 2, preference);
     const data = JSON.parse(res.text || "{}");
-    return { 
-      campaign: { ...data.campaign, id: `c-${Date.now()}`, leadsReached: 0, status: 'Draft', openRate: "0%" }, 
-      tasks: (data.tasks || []).map((t: any) => ({ ...t, id: `t-${Date.now()}`, status: 'todo' })) 
+    return {
+      campaign: { ...data.campaign, id: `c-${Date.now()}`, leadsReached: 0, status: 'Draft', openRate: "0%" },
+      tasks: (data.tasks || []).map((t: any) => ({ ...t, id: `t-${Date.now()}`, status: 'todo' }))
     };
   }
 
@@ -91,6 +92,24 @@ export class GeminiService {
     const prompt = `Tareas estratégicas para: ${leads.map(l => l.businessName).join(",")}. JSON.`;
     const res = await this.callWithResilience("pro", { responseMimeType: "application/json" }, prompt, 2, preference);
     return JSON.parse(res.text || "[]").map((t: any) => ({ ...t, id: `st-${Date.now()}`, status: 'todo' }));
+  }
+
+  /**
+   * Verifica la conexión real probando una respuesta mínima.
+   * Esto permite detectar si la API Key es válida y si hay cuota disponible.
+   */
+  async testConnection(): Promise<{ success: boolean; message: string }> {
+    try {
+      // Usamos flash para la prueba para no consumir cuota Pro
+      // Un prompt mínimo para verificar disponibilidad
+      await this.callWithResilience("flash", {}, "ping", 1);
+      return { success: true, message: "Conexión exitosa con Gemini AI." };
+    } catch (e: any) {
+      if (e.message === "USER_EXCEEDED_QUOTA") {
+        return { success: false, message: "Cuota agotada (429). Intente más tarde." };
+      }
+      return { success: false, message: e.message || "Error de conexión con el proveedor." };
+    }
   }
 }
 

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Language, translations } from '../translations';
 import { workspace } from '../services/workspaceService';
 import { quotaService } from '../services/quotaService';
+import { gemini } from '../services/geminiService';
 
 interface IntegrationsProps {
   language: Language;
@@ -22,31 +23,72 @@ const Integrations: React.FC<IntegrationsProps> = ({ language }) => {
   useEffect(() => {
     loadKeys();
     checkHealth();
+
+    console.log("%c[DEBUG] Omni Environment Check", "color: #3b82f6; font-weight: bold");
+    const vKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    console.log("process.env.API_KEY:", process.env.API_KEY ? "EXISTS" : "MISSING");
+    console.log("VITE_GEMINI_API_KEY:", vKey ? "EXISTS" : "MISSING");
+
+    const handleUpdate = () => {
+      // Solo actualizamos el estado visual de cuota si cambia algo
+      // pero checkHealth() es asíncrono y pesado (hace un fetch)
+      // así que mejor solo forzamos un re-render o una actualización ligera
+      // Sin embargo, para que el contador cambie, necesitamos llamar a getQuotaStatusText
+      // lo cual sucede en cada render. Solo necesitamos forzar un render.
+      setSystemHealth(prev => ({ ...prev }));
+    };
+
+    window.addEventListener('quota_updated', handleUpdate);
+    const interval = setInterval(handleUpdate, 1000); // Para el segundero
+
+    return () => {
+      window.removeEventListener('quota_updated', handleUpdate);
+      clearInterval(interval);
+    };
   }, []);
 
   const checkHealth = async () => {
+    setSystemHealth(prev => ({ ...prev, gemini: 'checking', cloud: 'checking' }));
+
     // Verificar conexión al Cloud (Google Apps Script)
     const cloudOk = await workspace.testConnection(workspace.getConfig().gasUrl);
 
-    // Verificar si hay API Key de Gemini configurada
-    const hasApiKey = !!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY.length > 10;
+    // NUEVO: Sonda real a Gemini (verifica Key y Cuota en un solo golpe)
+    const geminiTest = await gemini.testConnection();
     const qPro = quotaService.getAvailability('pro');
+    const qFlash = quotaService.getAvailability('flash');
 
-    // Determinar estado de IA
     let geminiStatus = 'offline';
-    if (!hasApiKey) {
-      geminiStatus = 'no_key';
-    } else if (qPro.isDailyBlocked) {
-      geminiStatus = 'exhausted';
-    } else {
+    if (geminiTest.success) {
       geminiStatus = 'online';
+    } else {
+      const msg = geminiTest.message.toLowerCase();
+      if (msg.includes('429') || msg.includes('quota') || msg.includes('exhausted') || msg.includes('agotada')) {
+        geminiStatus = 'exhausted';
+      } else if (msg.includes('key') || msg.includes('invalid') || msg.includes('válida')) {
+        geminiStatus = 'no_key';
+      } else {
+        geminiStatus = 'offline';
+      }
     }
 
     setSystemHealth({
       cloud: cloudOk ? 'online' : 'offline',
       gemini: geminiStatus,
-      quota: !hasApiKey ? 'no_key' : (qPro.rpdLeft > 0 ? 'safe' : 'limit')
+      quota: geminiStatus === 'no_key' ? 'no_key' : (qPro.isDailyBlocked || qFlash.isDailyBlocked ? 'limit' : 'safe')
     });
+  };
+
+  const getQuotaStatusText = () => {
+    const q = quotaService.getAvailability('pro'); // Usamos Pro como referencia de "cuota crítica"
+    if (systemHealth.gemini === 'no_key') return 'SIN API KEY';
+    if (q.isBlocked) {
+      if (q.nextAvailableIn > 60) {
+        return `ESPERA ${Math.ceil(q.nextAvailableIn / 3600)}H`;
+      }
+      return `ESPERA ${q.nextAvailableIn}S`;
+    }
+    return 'SEGURO';
   };
 
   const loadKeys = async () => {
@@ -127,7 +169,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ language }) => {
           <div>
             <p className="text-[10px] font-black text-slate-500 uppercase">Cuota</p>
             <p className={`text-xs font-bold ${systemHealth.quota === 'safe' ? 'text-white' : systemHealth.quota === 'checking' ? 'text-yellow-400' : 'text-red-500'}`}>
-              {systemHealth.quota === 'safe' ? 'SEGURO' : systemHealth.quota === 'no_key' ? 'SIN API KEY' : systemHealth.quota === 'checking' ? 'VERIFICANDO...' : 'LIMITE'}
+              {systemHealth.quota === 'checking' ? 'VERIFICANDO...' : getQuotaStatusText()}
             </p>
           </div>
         </div>

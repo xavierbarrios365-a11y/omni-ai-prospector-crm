@@ -19,13 +19,13 @@ interface SidebarProps {
   setModelPreference: (p: AIModelPreference) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
+const Sidebar: React.FC<SidebarProps> = ({
   activeTab, setActiveTab, language, setLanguage, onLogout, user, isOpen, setIsOpen, onRefresh, isRefreshing,
   modelPreference, setModelPreference
 }) => {
   const currentLang = language || 'es';
   const t = translations[currentLang]?.sidebar || translations['es'].sidebar;
-  
+
   const [quotas, setQuotas] = useState({
     flash: quotaService.getAvailability('flash'),
     pro: quotaService.getAvailability('pro')
@@ -38,7 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         pro: quotaService.getAvailability('pro')
       });
     }, 1000);
-    
+
     const handleUpdate = () => {
       setQuotas({
         flash: quotaService.getAvailability('flash'),
@@ -57,12 +57,12 @@ const Sidebar: React.FC<SidebarProps> = ({
     const rpmPerc = (availability.rpmLeft / availability.rpmTotal) * 100;
     const rpdPerc = (availability.rpdLeft / availability.rpdTotal) * 100;
     const isBlocked = availability.isBlocked;
-    
+
     return (
       <div className="space-y-1.5">
         <div className="flex justify-between items-center">
           <span className={`text-[7px] font-black uppercase tracking-widest ${isBlocked ? 'text-red-400' : 'text-slate-500'}`}>
-            {label} {availability.rpmLeft}/{availability.rpmTotal}
+            {label} {isBlocked ? (availability.nextAvailableIn > 60 ? `(ESPERA ${Math.ceil(availability.nextAvailableIn / 3600)}H)` : `(ESPERA ${availability.nextAvailableIn}S)`) : `${availability.rpmLeft}/${availability.rpmTotal}`}
           </span>
         </div>
         <div className="h-0.5 bg-white/5 rounded-full overflow-hidden">
@@ -90,40 +90,40 @@ const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden" onClick={() => setIsOpen?.(false)}></div>}
 
       <div className={`fixed inset-y-0 left-0 w-64 border-r border-white/10 flex flex-col h-screen bg-[#0d0d0f] z-50 transition-transform duration-300 md:translate-x-0 md:sticky md:top-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        
+
         <div className="p-6 pb-2">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent tracking-tighter uppercase">Omni AI</h1>
-          
+
           <div className="mt-6 p-4 bg-white/5 border border-white/5 rounded-2xl space-y-3">
-             <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Sincronización Cloud</p>
-             {renderQuotaBar('Flash Core', quotas.flash, 'blue')}
-             {renderQuotaBar('Pro Analyzer', quotas.pro, 'indigo')}
+            <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest">Sincronización Cloud</p>
+            {renderQuotaBar('Flash Core', quotas.flash, 'blue')}
+            {renderQuotaBar('Pro Analyzer', quotas.pro, 'indigo')}
           </div>
         </div>
 
         {/* SELECTOR DE MOTOR DE INTELIGENCIA */}
         <div className="px-6 py-2">
-           <div className="p-3 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl">
-              <p className="text-[7px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3 text-center">Núcleo de Inteligencia</p>
-              <div className="flex bg-black/40 rounded-xl p-1 gap-1">
-                 {(['auto', 'pro', 'flash'] as const).map((pref) => (
-                   <button 
-                     key={pref}
-                     onClick={() => setModelPreference(pref)}
-                     className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${modelPreference === pref ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
-                   >
-                     {pref}
-                   </button>
-                 ))}
-              </div>
-              <p className="text-[6px] text-slate-600 mt-2 text-center leading-tight">
-                {modelPreference === 'auto' ? 'IA decide según complejidad' : 
-                 modelPreference === 'pro' ? 'Máxima precisión (50/día)' : 
-                 'Máximo volumen (1500/día)'}
-              </p>
-           </div>
+          <div className="p-3 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl">
+            <p className="text-[7px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3 text-center">Núcleo de Inteligencia</p>
+            <div className="flex bg-black/40 rounded-xl p-1 gap-1">
+              {(['auto', 'pro', 'flash'] as const).map((pref) => (
+                <button
+                  key={pref}
+                  onClick={() => setModelPreference(pref)}
+                  className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase transition-all ${modelPreference === pref ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                  {pref}
+                </button>
+              ))}
+            </div>
+            <p className="text-[6px] text-slate-600 mt-2 text-center leading-tight">
+              {modelPreference === 'auto' ? 'IA decide según complejidad' :
+                modelPreference === 'pro' ? 'Máxima precisión (50/día)' :
+                  'Máximo volumen (1500/día)'}
+            </p>
+          </div>
         </div>
-        
+
         <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto custom-scrollbar">
           {menuItems.map((item) => (
             <button key={item.id} onClick={() => { setActiveTab(item.id); setIsOpen?.(false); }} className={`w-full flex items-center space-x-3 px-4 py-2 rounded-xl transition-all ${activeTab === item.id ? 'bg-blue-600/10 text-blue-400' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
@@ -132,10 +132,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             </button>
           ))}
         </nav>
-        
+
         <div className="p-4 space-y-2 border-t border-white/10 bg-black/20">
           <button onClick={onRefresh} disabled={isRefreshing} className="w-full bg-white/5 hover:bg-blue-600/10 text-slate-300 hover:text-blue-400 border border-white/5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center space-x-2">
-            {isRefreshing ? <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div> : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9" strokeWidth={2}/></svg>}
+            {isRefreshing ? <div className="animate-spin w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full"></div> : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9" strokeWidth={2} /></svg>}
             <span>Sync</span>
           </button>
           <div className="flex items-center justify-between px-3 py-2 bg-white/5 rounded-xl border border-white/5">
