@@ -1,0 +1,127 @@
+
+import React, { useState, useEffect } from 'react';
+import { Language, translations } from '../translations';
+import { gemini } from '../services/geminiService';
+import { workspace } from '../services/workspaceService';
+import { Campaign, Lead, Task, LeadStatus } from '../types';
+
+interface MarketingProps {
+  language: Language;
+  leads: Lead[];
+  campaigns: Campaign[];
+  setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+}
+
+const Marketing: React.FC<MarketingProps> = ({ language, leads, campaigns, setCampaigns, setTasks }) => {
+  const currentLang = language || 'es';
+  const t = translations[currentLang]?.marketing || translations['es'].marketing;
+
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [newCampaignData, setNewCampaignData] = useState({ industry: '', objective: '' });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case LeadStatus.NEW: return 'bg-blue-500/10 text-blue-400';
+      case LeadStatus.CONTACTED: return 'bg-amber-500/10 text-amber-400';
+      case LeadStatus.QUALIFIED: return 'bg-purple-500/10 text-purple-400';
+      case LeadStatus.CLOSED: return 'bg-emerald-500/10 text-emerald-400';
+      default: return 'bg-slate-500/10 text-slate-400';
+    }
+  };
+
+  const handleCreateCampaign = async () => {
+    if (!newCampaignData.industry) return;
+    setIsGenerating(true);
+    try {
+      const result = await gemini.generateCampaign(newCampaignData.industry, newCampaignData.objective);
+      setCampaigns(prev => [result.campaign, ...prev]);
+      setTasks(prev => [...result.tasks, ...prev]);
+      // Persistir campaña al cloud
+      await workspace.executeAction('saveCampaign', result.campaign);
+      // Persistir tareas asociadas al cloud
+      for (const task of result.tasks) {
+        await workspace.executeAction('saveTask', task);
+      }
+      setShowCreateModal(false);
+    } catch (e) { console.error(e); } finally { setIsGenerating(false); }
+  };
+
+  return (
+    <div className="space-y-8 animate-fade-in pb-20">
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-white uppercase tracking-tighter">AI Outreach Studio</h2>
+          <p className="text-slate-400">Marketing inteligente con cerebro Cloud y Sincronización de Leads.</p>
+        </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold text-xs shadow-lg uppercase tracking-widest"
+        >
+          + Nueva Campaña
+        </button>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-1 space-y-4">
+          <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">Campañas Activas</h3>
+          {campaigns.length === 0 ? (
+            <div className="p-8 border-2 border-dashed border-white/10 rounded-3xl text-center text-slate-600 text-xs font-bold uppercase">No hay campañas lanzadas</div>
+          ) : (
+            campaigns.map(c => (
+              <div key={c.id} onClick={() => setSelectedCampaign(c)} className={`glass p-6 rounded-3xl border ${selectedCampaign?.id === c.id ? 'border-blue-500 shadow-lg shadow-blue-600/10' : 'border-white/10'} cursor-pointer transition-all`}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">{c.targetIndustry}</span>
+                  <span className="text-[10px] text-emerald-400 font-bold">{c.status}</span>
+                </div>
+                <h4 className="text-white font-bold">{c.name}</h4>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="lg:col-span-2 space-y-6">
+          <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">Objetivos de Ataque (Leads Disponibles)</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {leads.filter(l => l.industry.toLowerCase().includes(selectedCampaign?.targetIndustry.toLowerCase() || '')).map(lead => (
+              <div key={lead.id} className="glass p-5 rounded-3xl border border-white/5 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <h4 className="text-white font-bold truncate pr-2">{lead.businessName}</h4>
+                    <span className={`text-[8px] font-black px-2 py-0.5 rounded uppercase ${getStatusColor(lead.status)}`}>{lead.status}</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 line-clamp-1 mb-4">{lead.website}</p>
+                  <div className="flex space-x-2">
+                    {lead.email ? <span className="w-6 h-6 rounded bg-emerald-500/10 flex items-center justify-center text-[10px]">📧</span> : <span className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-[10px] grayscale opacity-50">❌</span>}
+                    {lead.instagram ? <span className="w-6 h-6 rounded bg-pink-500/10 flex items-center justify-center text-[10px]">📸</span> : <span className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-[10px] grayscale opacity-50">❌</span>}
+                    {lead.facebook ? <span className="w-6 h-6 rounded bg-blue-500/10 flex items-center justify-center text-[10px]">👥</span> : <span className="w-6 h-6 rounded bg-red-500/10 flex items-center justify-center text-[10px] grayscale opacity-50">❌</span>}
+                  </div>
+                </div>
+                <button className="mt-4 w-full bg-white/5 hover:bg-white/10 py-2 rounded-xl text-[10px] font-black text-white uppercase tracking-widest">Generar Copy de Ataque</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="glass w-full max-w-lg p-10 rounded-[2.5rem] border border-white/20">
+            <h3 className="text-2xl font-black text-white mb-6 uppercase tracking-tighter">Lanzar Campaña IA</h3>
+            <div className="space-y-4">
+              <input type="text" placeholder="Nicho..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white" value={newCampaignData.industry} onChange={e => setNewCampaignData({ ...newCampaignData, industry: e.target.value })} />
+              <textarea placeholder="Objetivo..." className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white h-32" value={newCampaignData.objective} onChange={e => setNewCampaignData({ ...newCampaignData, objective: e.target.value })} />
+              <button onClick={handleCreateCampaign} disabled={isGenerating} className="w-full py-4 bg-blue-600 rounded-xl font-bold text-white uppercase tracking-widest">
+                {isGenerating ? 'Configurando Agentes...' : 'Lanzar Campaña'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Marketing;

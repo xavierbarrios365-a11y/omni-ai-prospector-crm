@@ -1,0 +1,9 @@
+{
+  "name": "Omni AI Prospector & CRM",
+  "description": "Plataforma agnóstica de generación de leads y CRM impulsada por IA, cuya identidad se define por la Base de Conocimiento del usuario.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
